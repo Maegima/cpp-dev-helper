@@ -1,0 +1,57 @@
+{
+    "name": "cpp-impl-creator",
+    "displayName": "C++ Implementation Creator",
+    "description": "A simple extension to generate C++ function implementations in a .cpp file from a .hpp file.",
+    "version": "0.0.1",
+    "publisher": "noone",
+    "icon": "logo.png",
+    "engines": {
+        "vscode": "^1.88.0"
+    },
+    "categories": [
+        "Programming Languages",
+        "Snippets",
+        "Other"
+    ],
+    "activationEvents": [],
+    "main": "./out/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "cpp-impl-creator.generateImplementation",
+                "title": "C++: Generate Implementation in CPP file"
+            },
+            {
+                "command": "cpp-impl-creator.generateSingleImplementation",
+                "title": "C++: Generate Single Implementation at Cursor"
+            }
+        ],
+        "menus": {
+            "editor/context": [
+                {
+                    "command": "cpp-impl-creator.generateSingleImplementation",
+                    "group": "8_cpp_imp_helper",
+                    "when": "(resourceExtname == .hpp || resourceExtname == .h) && (resourceLangId == cpp || resourceLangId == c)"
+                }
+            ]
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "pretest": "npm run compile && npm run lint",
+        "lint": "eslint src",
+        "test": "vscode-test"
+    },
+    "devDependencies": {
+        "@types/node": "^20.11.25",
+        "@types/vscode": "^1.88.0",
+        "@typescript-eslint/eslint-plugin": "^7.3.1",
+        "@typescript-eslint/parser": "^7.3.1",
+        "@vscode/test-cli": "^0.0.6",
+        "@vscode/test-electron": "^2.3.8",
+        "eslint": "^8.57.0",
+        "typescript": "^5.3.3"
+    }
+}
