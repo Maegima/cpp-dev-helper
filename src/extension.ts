@@ -21,6 +21,12 @@ interface SetupResult {
     className: string | undefined;
 }
 
+interface Implementation {
+    text: string,
+    position: number,
+    line: number
+}
+
 function processOperatorDeclaration(declaration: string, className: string): string | null {
     const match = declaration.trim().match(
         new RegExp(
@@ -28,7 +34,7 @@ function processOperatorDeclaration(declaration: string, className: string): str
             `${opsymRegex.source}${paramRegex.source}${constRegex.source};`
         )
     );
-    if (!match) return null; 
+    if (!match) return null;
 
     const returnType = match[1].trim();
     const operatorToken = match[2].trim();
@@ -40,13 +46,11 @@ function processOperatorDeclaration(declaration: string, className: string): str
 }
 
 function processFunctionDeclaration(declaration: string, className: string): string | null {
-    // 1. Try to process as an operator() first
     const operatorImpl = processOperatorDeclaration(declaration, className);
     if (operatorImpl) {
         return operatorImpl;
     }
 
-    // 2. If not operator(), the standard logic for functions/constructors
     const match = declaration.trim().match(
         new RegExp(
             `^(?:${virtuRegex.source}${typesRegex.source})?` +
@@ -54,7 +58,7 @@ function processFunctionDeclaration(declaration: string, className: string): str
         )
     );
 
-    if (!match) return null; // No valid standard declaration found on this line
+    if (!match) return null;
 
     const returnTypeRaw = match[2];
     const functionName = match[3].trim();
@@ -71,10 +75,9 @@ function processFunctionDeclaration(declaration: string, className: string): str
     }
 
     // Final Format: [ReturnType] ClassName::FunctionName(Args) ConstQualifier { \n\n }
-    return `${returnPrefix}${functionName}${argsWithParens}${constQualifier} {\n    \n}\n\n`;
+    return `${returnPrefix}${functionName}${argsWithParens}${constQualifier} {\n}\n\n`;
 }
 
-// Helper function to find the class name in the document (remains unchanged)
 function findClassName(hppContent: string): string | undefined {
     const classNameMatch = hppContent.match(/class\s+(\w+)\s*(:\s*public\s+\w+\s*)?\{/);
     return classNameMatch ? classNameMatch[1] : undefined;
@@ -100,10 +103,6 @@ function setupAnalyser(): SetupResult {
     }
 
     cppFilePath = hppFilePath.replace(/\.h(pp)?$/, '.cpp');
-    if (!fs.existsSync(cppFilePath)) {
-        vscode.window.showErrorMessage(`Corresponding .cpp file not found: ${cppFilePath}`);
-        return result;
-    }
 
     hppContent = editor.document.getText();
     className = findClassName(hppContent);
@@ -115,14 +114,61 @@ function setupAnalyser(): SetupResult {
     return { editor, hppContent, cppFilePath, className };
 }
 
-async function writeToFile(filePath: string, className: string, text: string) {
-    const cppDocument = await vscode.workspace.openTextDocument(filePath);
-    const cppEditor = await vscode.window.showTextDocument(cppDocument, vscode.ViewColumn.Beside);
+async function getImplementations(hppContent: string, cppFilePath: string, className: string, singleImpl: string = "") {
+    const cppDocument = await vscode.workspace.openTextDocument(cppFilePath);
+    const existingCppContent = cppDocument.getText();
 
+    let implementations: Implementation[] = [];
+    for(const lineText of hppContent.split('\n')) {
+        const decl = processFunctionDeclaration(lineText, className);
+        if (decl) {
+            let imp = {text: decl, line: -1, position: -1};
+            const signatureMatch = decl.match(/(.+?)\s*\{\s*/s);
+            if (signatureMatch) {
+                const signature = signatureMatch[1].trim();
+                let pos = existingCppContent.indexOf(signature);
+                if(pos > 0) {
+                    imp.line = existingCppContent.substring(0, pos).split('\n').length;
+                    imp.position = imp.line;
+                }
+            }
+            implementations.push(imp);
+        }
+    }
+    let lastLine = cppDocument.lineCount-1;
+    for(const impl of implementations.reverse()) {
+        if(impl.line == -1) {
+            impl.position = lastLine;
+        } else {
+            lastLine = impl.line-1;
+        }
+        if(singleImpl && singleImpl != impl.text) {
+            impl.position = 0;
+        }
+    }
+    return implementations;
+}
+
+/**
+ * Writes new content to a file, skipping implementations that already exist in the target file.
+ */
+async function writeToFile(filePath: string, className: string, newImplementations: Implementation[]) {
+    const cppDocument = await vscode.workspace.openTextDocument(filePath);
+    const existingCppContent = cppDocument.getText();
+    const lastLine = cppDocument.lineCount-1;
+    const lastPosition = new vscode.Position(lastLine, cppDocument.lineAt(lastLine).text.length);
+
+    const cppEditor = await vscode.window.showTextDocument(cppDocument, vscode.ViewColumn.Beside);
     cppEditor.edit(editBuilder => {
-        const lastLine = cppDocument.lineCount - 1;
-        const position = new vscode.Position(lastLine, cppDocument.lineAt(lastLine).text.length);
-        editBuilder.insert(position, text);
+        if(!existingCppContent.endsWith("\n")) {
+            editBuilder.insert(lastPosition, "\n");
+        }
+        for(const block of newImplementations) {
+            if(block.position > 0 && block.line == -1) {
+                const position = new vscode.Position(block.position, 0);
+                editBuilder.insert(position, block.text);
+            }
+        }
     }).then(success => {
         if (success) {
             vscode.window.showInformationMessage(`Generated implementation(s) for ${className} in ${path.basename(filePath)}.`);
@@ -137,15 +183,9 @@ export function activate(context: vscode.ExtensionContext) {
         let { editor, hppContent, cppFilePath, className } = setupAnalyser();
         if (!editor || !hppContent || !cppFilePath || !className) return;
 
-        let implementationSnippet = "";
-        for (const lineText of hppContent.split('\n')) {
-            const implementation = processFunctionDeclaration(lineText, className);
-            if (implementation) {
-                implementationSnippet += implementation;
-            }
-        }
-        if (implementationSnippet) {
-            await writeToFile(cppFilePath, className, implementationSnippet);
+        let implementations = await getImplementations(hppContent, cppFilePath, className);
+        if (implementations) {
+            await writeToFile(cppFilePath, className, implementations);
         }
     });
 
@@ -158,7 +198,10 @@ export function activate(context: vscode.ExtensionContext) {
         const implementation = processFunctionDeclaration(lineText, className);
 
         if (implementation) {
-            await writeToFile(cppFilePath, className, implementation);
+            let implementations = await getImplementations(hppContent, cppFilePath, className, implementation);
+            if (implementations) {
+                await writeToFile(cppFilePath, className, implementations);
+            }
         } else {
             vscode.window.showErrorMessage(`Could not parse the line:\n\n${lineText.trim()}\n\nEnsure it is a valid function or constructor.`);
         }
