@@ -29,9 +29,14 @@
         "menus": {
             "editor/context": [
                 {
+                    "command": "cpp-impl-creator.generateImplementation",
+                    "group": "8_cpp_imp_helper",
+                    "when": "(resourceExtname == .hpp || resourceExtname == .h)"
+                },
+                {
                     "command": "cpp-impl-creator.generateSingleImplementation",
                     "group": "8_cpp_imp_helper",
-                    "when": "(resourceExtname == .hpp || resourceExtname == .h) && (resourceLangId == cpp || resourceLangId == c)"
+                    "when": "(resourceExtname == .hpp || resourceExtname == .h)"
                 }
             ]
         }
