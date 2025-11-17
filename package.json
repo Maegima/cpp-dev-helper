@@ -1,10 +1,10 @@
 {
-    "name": "cpp-impl-creator",
-    "displayName": "C++ Implementation Creator",
-    "description": "A simple extension to generate C++ function implementations in a .cpp file from a .hpp file.",
-    "version": "0.0.1",
-    "publisher": "noone",
-    "icon": "logo.png",
+    "name": "cpp-dev-helper",
+    "displayName": "C++ Development Helper",
+    "description": "A simple extension to aid C++ development, with features like generating function implementations and more.",
+    "version": "0.0.2",
+    "publisher": "maegima",
+    "icon": "icon.png",
     "engines": {
         "vscode": "^1.88.0"
     },
@@ -18,23 +18,23 @@
     "contributes": {
         "commands": [
             {
-                "command": "cpp-impl-creator.generateImplementation",
+                "command": "cpp-dev-helper.generateImplementation",
                 "title": "C++: Generate Implementation in CPP file"
             },
             {
-                "command": "cpp-impl-creator.generateSingleImplementation",
+                "command": "cpp-dev-helper.generateSingleImplementation",
                 "title": "C++: Generate Single Implementation at Cursor"
             }
         ],
         "menus": {
             "editor/context": [
                 {
-                    "command": "cpp-impl-creator.generateImplementation",
+                    "command": "cpp-dev-helper.generateImplementation",
                     "group": "8_cpp_imp_helper",
                     "when": "(resourceExtname == .hpp || resourceExtname == .h)"
                 },
                 {
-                    "command": "cpp-impl-creator.generateSingleImplementation",
+                    "command": "cpp-dev-helper.generateSingleImplementation",
                     "group": "8_cpp_imp_helper",
                     "when": "(resourceExtname == .hpp || resourceExtname == .h)"
                 }
