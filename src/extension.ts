@@ -79,7 +79,7 @@ function processFunctionDeclaration(declaration: string, className: string): str
 }
 
 function findClassName(hppContent: string): string | undefined {
-    const classNameMatch = hppContent.match(/class\s+(\w+)\s*(:\s*public\s+\w+\s*)?\{/);
+    const classNameMatch = hppContent.match(/class\s+(\w+)\s*(:\s*(public)?\s+\w+\s*)?\{/);
     return classNameMatch ? classNameMatch[1] : undefined;
 }
 
@@ -136,7 +136,8 @@ async function getImplementations(hppContent: string, cppFilePath: string, class
         }
     }
     let lastLine = cppDocument.lineCount-1;
-    for(const impl of implementations.reverse()) {
+    for(let i = implementations.length - 1; i >= 0; i--) {
+        let impl = implementations[i];
         if(impl.line == -1) {
             impl.position = lastLine;
         } else {
@@ -157,15 +158,17 @@ async function writeToFile(filePath: string, className: string, newImplementatio
     const existingCppContent = cppDocument.getText();
     const lastLine = cppDocument.lineCount-1;
     const lastPosition = new vscode.Position(lastLine, cppDocument.lineAt(lastLine).text.length);
-
     const cppEditor = await vscode.window.showTextDocument(cppDocument, vscode.ViewColumn.Beside);
     cppEditor.edit(editBuilder => {
+        if(!existingCppContent.match(/#include\s+"HatsDisplayPanel\.hpp"/)) {
+            editBuilder.insert(new vscode.Position(0, 0), `#include "${className}.hpp"\n`)
+        }
         if(!existingCppContent.endsWith("\n")) {
             editBuilder.insert(lastPosition, "\n");
         }
         for(const block of newImplementations) {
-            if(block.position > 0 && block.line == -1) {
-                const position = new vscode.Position(block.position, 0);
+            if(block.position >= 0 && block.line == -1) {
+                const position = block.position == lastLine ? lastPosition : new vscode.Position(block.position, 0);
                 editBuilder.insert(position, block.text);
             }
         }
@@ -179,7 +182,7 @@ async function writeToFile(filePath: string, className: string, newImplementatio
 }
 
 export function activate(context: vscode.ExtensionContext) {
-    let disposableAll = vscode.commands.registerCommand('cpp-impl-creator.generateImplementation', async () => {
+    let disposableAll = vscode.commands.registerCommand('cpp-dev-helper.generateImplementation', async () => {
         let { editor, hppContent, cppFilePath, className } = setupAnalyser();
         if (!editor || !hppContent || !cppFilePath || !className) return;
 
@@ -189,7 +192,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    let disposableSingle = vscode.commands.registerCommand('cpp-impl-creator.generateSingleImplementation', async () => {
+    let disposableSingle = vscode.commands.registerCommand('cpp-dev-helper.generateSingleImplementation', async () => {
         let { editor, hppContent, cppFilePath, className } = setupAnalyser();
         if (!editor || !hppContent || !cppFilePath || !className) return;
 
