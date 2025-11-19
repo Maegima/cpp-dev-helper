@@ -1,85 +1,12 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-// Return Type (e.g., 'void', 'int&')
-const typesRegex = /([\w\d<>*&]+)\s+/;
-// The actual operator token (e.g., '+', '[]', '()')
-const opsymRegex = /(!=|!==|==|===|\+|-|\*|\/|%|\^|&|\||~|!|=|<=|>=|<<|>>|\+=|-=|\*=|%=|\^=|&=|\|=|<<=|>>=|&&|\|\||\+\+|--|,|->\*|->|\[\]|\(\)|<=>|<|>)\s*/;
-// Arguments (e.g., '(int val1)', '()') - Note: () are part of G3 for non-[] operators
-const paramRegex = /(\([^)]*\))\s*/;
-// Const qualifier (optional)
-let constRegex = /(const)?\s*/;
-// Function/Constructor Name (e.g., ReadInputs, ~GamepadWindow)
-const namesRegex = /([\w\d~]+)\s*/;
-// virtual (optional)
-const virtuRegex = /(virtual\s+)?/;
+import { findClassName, getImplementations, Implementation, processFunctionDeclaration } from './parsing';
 
 interface SetupResult {
     editor: vscode.TextEditor | undefined;
     hppContent: string | undefined;
     cppFilePath: string | undefined;
     className: string | undefined;
-}
-
-export interface Implementation {
-    text: string,
-    position: number,
-    line: number
-}
-
-function processOperatorDeclaration(declaration: string, className: string): string | null {
-    const match = declaration.trim().match(
-        new RegExp(
-            `^${typesRegex.source}operator` +
-            `${opsymRegex.source}${paramRegex.source}${constRegex.source};`
-        )
-    );
-    if (!match) return null;
-
-    const returnType = match[1].trim();
-    const operatorToken = match[2].trim();
-    const argsWithParens = match[3].trim();
-    const constQualifier = match[4] ? ` ${match[4].trim()}` : '';
-
-    // Format: ReturnType ClassName::operator TOKEN (Args/inside Brackets) ConstQualifier { \n\n }
-    return `${returnType} ${className}::operator${operatorToken}${argsWithParens}${constQualifier} {\n    \n}\n\n`;
-}
-
-function processFunctionDeclaration(declaration: string, className: string): string | null {
-    const operatorImpl = processOperatorDeclaration(declaration, className);
-    if (operatorImpl) {
-        return operatorImpl;
-    }
-
-    const match = declaration.trim().match(
-        new RegExp(
-            `^(?:${virtuRegex.source}${typesRegex.source})?` +
-            `${namesRegex.source}${paramRegex.source}${constRegex.source};`
-        )
-    );
-
-    if (!match) return null;
-
-    const returnTypeRaw = match[2];
-    const functionName = match[3].trim();
-    const argsWithParens = match[4].trim();
-    const constQualifier = match[5] ? ` ${match[5].trim()}` : '';
-
-    let returnPrefix = '';
-
-    if (returnTypeRaw) {
-        returnPrefix = `${returnTypeRaw.trim()} ${className}::`;
-    } else {
-        // Constructor/Destructor
-        returnPrefix = `${className}::`;
-    }
-
-    // Final Format: [ReturnType] ClassName::FunctionName(Args) ConstQualifier { \n\n }
-    return `${returnPrefix}${functionName}${argsWithParens}${constQualifier} {\n}\n\n`;
-}
-
-function findClassName(hppContent: string): string | undefined {
-    const classNameMatch = hppContent.match(/class\s+(\w+)\s*(:\s*(public)?\s+\w+\s*)?\{/);
-    return classNameMatch ? classNameMatch[1] : undefined;
 }
 
 function setupAnalyser(): SetupResult {
@@ -112,42 +39,6 @@ function setupAnalyser(): SetupResult {
         return result;
     }
     return { editor, hppContent, cppFilePath, className };
-}
-
-async function getImplementations(hppContent: string, cppFilePath: string, className: string, singleImpl: string = "") {
-    const cppDocument = await vscode.workspace.openTextDocument(cppFilePath);
-    const existingCppContent = cppDocument.getText();
-
-    const implementations: Implementation[] = [];
-    for(const lineText of hppContent.split('\n')) {
-        const decl = processFunctionDeclaration(lineText, className);
-        if (decl) {
-            const imp = {text: decl, line: -1, position: -1};
-            const signatureMatch = decl.match(/(.+?)\s*\{\s*/s);
-            if (signatureMatch) {
-                const signature = signatureMatch[1].trim();
-                const pos = existingCppContent.indexOf(signature);
-                if(pos > 0) {
-                    imp.line = existingCppContent.substring(0, pos).split('\n').length;
-                    imp.position = imp.line;
-                }
-            }
-            implementations.push(imp);
-        }
-    }
-    let lastLine = cppDocument.lineCount-1;
-    for(let i = implementations.length - 1; i >= 0; i--) {
-        const impl = implementations[i];
-        if(impl.line == -1) {
-            impl.position = lastLine;
-        } else {
-            lastLine = impl.line-1;
-        }
-        if(singleImpl && singleImpl != impl.text) {
-            impl.position = 0;
-        }
-    }
-    return implementations;
 }
 
 /**
@@ -185,23 +76,27 @@ export function activate(context: vscode.ExtensionContext) {
     const disposableAll = vscode.commands.registerCommand('cpp-dev-helper.generateImplementation', async () => {
         const { editor, hppContent, cppFilePath, className } = setupAnalyser();
         if (!editor || !hppContent || !cppFilePath || !className) return;
+        const cppDocument = await vscode.workspace.openTextDocument(cppFilePath);
+        const existingCppContent = cppDocument.getText();
 
-        const implementations = await getImplementations(hppContent, cppFilePath, className);
+        const implementations = getImplementations(hppContent, existingCppContent, className);
         if (implementations) {
             await writeToFile(cppFilePath, className, implementations);
         }
     });
 
     const disposableSingle = vscode.commands.registerCommand('cpp-dev-helper.generateSingleImplementation', async () => {
-        const { editor, hppContent, cppFilePath, className } = setupAnalyser();
+        const { editor, hppContent, cppFilePath, className } = await setupAnalyser();
         if (!editor || !hppContent || !cppFilePath || !className) return;
+        const cppDocument = await vscode.workspace.openTextDocument(cppFilePath);
+        const existingCppContent = cppDocument.getText();
 
         const cursorPosition = editor.selection.active;
         const lineText = editor.document.lineAt(cursorPosition.line).text;
         const implementation = processFunctionDeclaration(lineText, className);
 
         if (implementation) {
-            const implementations = await getImplementations(hppContent, cppFilePath, className, implementation);
+            const implementations = getImplementations(hppContent, existingCppContent, className, implementation);
             if (implementations) {
                 await writeToFile(cppFilePath, className, implementations);
             }
