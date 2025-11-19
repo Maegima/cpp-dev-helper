@@ -1,0 +1,47 @@
+{
+    "root": true,
+    "parser": "@typescript-eslint/parser",
+    "parserOptions": {
+        "ecmaVersion": 2020,
+        "sourceType": "module",
+        "project": true,
+        "tsconfigRootDir": "__dirname"
+    },
+    "plugins": [
+        "@typescript-eslint"
+    ],
+    "extends": [
+        "eslint:recommended",
+        "plugin:@typescript-eslint/recommended"
+    ],
+    "env": {
+        "node": true,
+        "browser": true,
+        "es6": true
+    },
+    "ignorePatterns": [
+        "out/",
+        "dist/",
+        "node_modules/"
+    ],
+    "rules": {
+        "@typescript-eslint/no-explicit-any": "warn",
+        "prefer-const":"warn",
+        "semi": [
+            "error",
+            "always"
+        ]
+    },
+    "overrides": [
+        {
+            "files": [
+                "*.test.ts",
+                "src/__tests__/**/*.ts"
+            ],
+            "env": {
+                "jest": true
+            },
+            "rules": {}
+        }
+    ]
+}

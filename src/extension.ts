@@ -1,18 +1,17 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
 import * as path from 'path';
 // Return Type (e.g., 'void', 'int&')
-const typesRegex = /([\w\d<>*&]+)\s+/
+const typesRegex = /([\w\d<>*&]+)\s+/;
 // The actual operator token (e.g., '+', '[]', '()')
 const opsymRegex = /(!=|!==|==|===|\+|-|\*|\/|%|\^|&|\||~|!|=|<=|>=|<<|>>|\+=|-=|\*=|%=|\^=|&=|\|=|<<=|>>=|&&|\|\||\+\+|--|,|->\*|->|\[\]|\(\)|<=>|<|>)\s*/;
 // Arguments (e.g., '(int val1)', '()') - Note: () are part of G3 for non-[] operators
-const paramRegex = /(\([^\)]*\))\s*/
+const paramRegex = /(\([^)]*\))\s*/;
 // Const qualifier (optional)
-const constRegex = /(const)?\s*/
+let constRegex = /(const)?\s*/;
 // Function/Constructor Name (e.g., ReadInputs, ~GamepadWindow)
-const namesRegex = /([\w\d~]+)\s*/
+const namesRegex = /([\w\d~]+)\s*/;
 // virtual (optional)
-const virtuRegex = /(virtual\s+)?/
+const virtuRegex = /(virtual\s+)?/;
 
 interface SetupResult {
     editor: vscode.TextEditor | undefined;
@@ -21,7 +20,7 @@ interface SetupResult {
     className: string | undefined;
 }
 
-interface Implementation {
+export interface Implementation {
     text: string,
     position: number,
     line: number
@@ -84,8 +83,9 @@ function findClassName(hppContent: string): string | undefined {
 }
 
 function setupAnalyser(): SetupResult {
-    let { editor, hppContent, cppFilePath, className }: SetupResult = {
-        editor: vscode.window.activeTextEditor,
+    const editor = vscode.window.activeTextEditor;
+    let { hppContent, cppFilePath, className }: SetupResult = {
+        editor: editor,
         hppContent: undefined,
         cppFilePath: undefined,
         className: undefined
@@ -118,15 +118,15 @@ async function getImplementations(hppContent: string, cppFilePath: string, class
     const cppDocument = await vscode.workspace.openTextDocument(cppFilePath);
     const existingCppContent = cppDocument.getText();
 
-    let implementations: Implementation[] = [];
+    const implementations: Implementation[] = [];
     for(const lineText of hppContent.split('\n')) {
         const decl = processFunctionDeclaration(lineText, className);
         if (decl) {
-            let imp = {text: decl, line: -1, position: -1};
+            const imp = {text: decl, line: -1, position: -1};
             const signatureMatch = decl.match(/(.+?)\s*\{\s*/s);
             if (signatureMatch) {
                 const signature = signatureMatch[1].trim();
-                let pos = existingCppContent.indexOf(signature);
+                const pos = existingCppContent.indexOf(signature);
                 if(pos > 0) {
                     imp.line = existingCppContent.substring(0, pos).split('\n').length;
                     imp.position = imp.line;
@@ -137,7 +137,7 @@ async function getImplementations(hppContent: string, cppFilePath: string, class
     }
     let lastLine = cppDocument.lineCount-1;
     for(let i = implementations.length - 1; i >= 0; i--) {
-        let impl = implementations[i];
+        const impl = implementations[i];
         if(impl.line == -1) {
             impl.position = lastLine;
         } else {
@@ -153,7 +153,7 @@ async function getImplementations(hppContent: string, cppFilePath: string, class
 /**
  * Writes new content to a file, skipping implementations that already exist in the target file.
  */
-async function writeToFile(filePath: string, className: string, newImplementations: Implementation[]) {
+export async function writeToFile(filePath: string, className: string, newImplementations: Implementation[]) {
     const cppDocument = await vscode.workspace.openTextDocument(filePath);
     const existingCppContent = cppDocument.getText();
     const lastLine = cppDocument.lineCount-1;
@@ -161,7 +161,7 @@ async function writeToFile(filePath: string, className: string, newImplementatio
     const cppEditor = await vscode.window.showTextDocument(cppDocument, vscode.ViewColumn.Beside);
     cppEditor.edit(editBuilder => {
         if(!existingCppContent.match(/#include\s+"HatsDisplayPanel\.hpp"/)) {
-            editBuilder.insert(new vscode.Position(0, 0), `#include "${className}.hpp"\n`)
+            editBuilder.insert(new vscode.Position(0, 0), `#include "${className}.hpp"\n`);
         }
         if(!existingCppContent.endsWith("\n")) {
             editBuilder.insert(lastPosition, "\n");
@@ -182,18 +182,18 @@ async function writeToFile(filePath: string, className: string, newImplementatio
 }
 
 export function activate(context: vscode.ExtensionContext) {
-    let disposableAll = vscode.commands.registerCommand('cpp-dev-helper.generateImplementation', async () => {
-        let { editor, hppContent, cppFilePath, className } = setupAnalyser();
+    const disposableAll = vscode.commands.registerCommand('cpp-dev-helper.generateImplementation', async () => {
+        const { editor, hppContent, cppFilePath, className } = setupAnalyser();
         if (!editor || !hppContent || !cppFilePath || !className) return;
 
-        let implementations = await getImplementations(hppContent, cppFilePath, className);
+        const implementations = await getImplementations(hppContent, cppFilePath, className);
         if (implementations) {
             await writeToFile(cppFilePath, className, implementations);
         }
     });
 
-    let disposableSingle = vscode.commands.registerCommand('cpp-dev-helper.generateSingleImplementation', async () => {
-        let { editor, hppContent, cppFilePath, className } = setupAnalyser();
+    const disposableSingle = vscode.commands.registerCommand('cpp-dev-helper.generateSingleImplementation', async () => {
+        const { editor, hppContent, cppFilePath, className } = setupAnalyser();
         if (!editor || !hppContent || !cppFilePath || !className) return;
 
         const cursorPosition = editor.selection.active;
@@ -201,7 +201,7 @@ export function activate(context: vscode.ExtensionContext) {
         const implementation = processFunctionDeclaration(lineText, className);
 
         if (implementation) {
-            let implementations = await getImplementations(hppContent, cppFilePath, className, implementation);
+            const implementations = await getImplementations(hppContent, cppFilePath, className, implementation);
             if (implementations) {
                 await writeToFile(cppFilePath, className, implementations);
             }
