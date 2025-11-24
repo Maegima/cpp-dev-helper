@@ -2,7 +2,7 @@
     "name": "cpp-dev-helper",
     "displayName": "C++ Development Helper",
     "description": "A simple extension to aid C++ development, with features like generating function implementations and more.",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "publisher": "maegima",
     "icon": "icon.png",
     "engines": {
@@ -24,6 +24,10 @@
             {
                 "command": "cpp-dev-helper.generateSingleImplementation",
                 "title": "C++: Generate Single Implementation at Cursor"
+            },
+            {
+                "command": "cpp-dev-helper.formatDocument",
+                "title": "Formats current document using clang-format and remove spacing for +, -, * and /"
             }
         ],
         "menus": {
@@ -37,8 +41,30 @@
                     "command": "cpp-dev-helper.generateSingleImplementation",
                     "group": "8_cpp_imp_helper",
                     "when": "(resourceExtname == .hpp || resourceExtname == .h)"
+                },
+                {
+                    "command": "cpp-dev-helper.formatDocument",
+                    "group": "8_cpp_imp_helper",
+                    "when": "(resourceExtname == .hpp || resourceExtname == .h || resourceExtname == .cpp || resourceExtname == .c)"
                 }
             ]
+        },
+        "keybindings": [
+            {
+                "command": "cpp-dev-helper.formatDocument",
+                "key": "ctrl+alt+f",
+                "when": "editorHasDocumentFormattingProvider && editorTextFocus && !editorReadonly && !inCompositeEditor"
+            }
+        ],
+        "configuration": {
+            "title": "C++ Dev Helper",
+            "properties": {
+                "cpp-dev-helper.enableClangFormat": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable or disable clang-format auto formatting for generated implementations."
+                }
+            }
         }
     },
     "scripts": {

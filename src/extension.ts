@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { findClassName, getImplementations, Implementation, processFunctionDeclaration } from './parsing';
+import { removeSpacesOutsideStringsInFile, executeClangFormatInPlace } from './format';
 
 interface SetupResult {
     editor: vscode.TextEditor | undefined;
@@ -105,7 +106,18 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    context.subscriptions.push(disposableAll, disposableSingle);
+    const disposableFormat = vscode.commands.registerCommand('cpp-dev-helper.formatDocument', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            vscode.window.showInformationMessage('No active editor found.');
+            return;
+        }
+        const currentFile = editor.document.fileName;
+        await executeClangFormatInPlace(currentFile);
+        await removeSpacesOutsideStringsInFile(currentFile);
+    });
+
+    context.subscriptions.push(disposableAll, disposableSingle, disposableFormat);
 }
 
 export function deactivate() { }

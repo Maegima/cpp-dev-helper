@@ -7,6 +7,14 @@ A simple Visual Studio Code extension designed to streamline C++ development by 
 - **Generate all implementations**: Automatically generates function implementations in the corresponding `.cpp` file for all functions declared in the `.hpp` file.
 - **Generate a single implementation**: Generate a specific function implementation at the cursor's location in the `.hpp` file.
 - **Automatic class name detection**: The extension detects the class name from the `.hpp` file to properly scope function implementations.
+- **Formating**: The extension can automatically format generated code using: clang-format (in-place). Uses clang-format if available, custom spacing cleanup for + - * / operators outside of strings.
+- **Output Logging**: All formatting operations and diagnostics are logged to the C++ Dev Helper output channel.
+
+| Command | Description |
+|---|---|
+| `cpp-dev-helper.generateImplementation`       | Generate all implementations from the active header. |
+| `cpp-dev-helper.generateSingleImplementation` | Generate just the implementation at cursor.          |
+
 
 ## Usage
 
@@ -29,8 +37,18 @@ The function implementation will be inserted at the appropriate location in the 
 You can also access the generation commands directly from the context menu by right-clicking in the `.hpp` file. Options for both generating all and generating a single implementation will appear if you right-click on function declarations.
 
 ## Configuration
+The extension works out of the box, but can be customized via settings:
 
-No configuration is required for the extension to work. It will automatically detect `.hpp` files and the corresponding `.cpp` file.
+| Setting | Default | Description |
+|---|---|---|
+| `cpp-dev-helper.enableClangFormat`                 | `true`  | Enables or disables clang-format auto-formatting. |
+
+Formatting Behavior
+- Looks for .clang-format only at the project root
+- If found -> used automatically
+- If not found -> falls back to LLVM style
+- Always runs clang-format in-place on the .cpp file
+- Applies custom operator spacing cleanup afterward
 
 ## Example
 
